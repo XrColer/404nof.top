@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>星 · 图 · 带鱼的思考</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-0: #01020a;
+      --bg-1: #03051a;
+      --bg-2: #080d28;
+      --star: #f7f4e6;
+      --accent: #8ab4ff;
+      --text: #d8def0;
+      --text-dim: #8b93ad;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background:
+        radial-gradient(ellipse at 50% 38%, var(--bg-2) 0%, var(--bg-1) 40%, var(--bg-0) 100%);
+      color: var(--text);
+      font-family: "Noto Serif SC", "Cinzel", "Times New Roman", serif;
+      overflow: hidden;
+    }
+
+    /* ===== 全屏星图 ===== */
+    #starfield {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      cursor: crosshair;
+      display: block;
+    }
+
+    /* ===== 居中主标题 ===== */
+    header {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 2;
+      pointer-events: none;
+      width: 100%;
+      padding: 0 24px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-family: "Cinzel", "Noto Serif SC", serif;
+      font-size: clamp(72px, 14vw, 180px);
+      letter-spacing: 0.18em;
+      font-weight: 600;
+      color: var(--star);
+      text-shadow:
+        0 0 32px rgba(138, 180, 255, 0.45),
+        0 0 80px rgba(138, 180, 255, 0.2);
+      line-height: 1.1;
+    }
+
+    header p.subtitle {
+      margin: 22px 0 0;
+      color: var(--text-dim);
+      font-size: clamp(14px, 1.4vw, 20px);
+      letter-spacing: 0.4em;
+    }
+
+    /* ===== 悬停星名 ===== */
+    #tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: rgba(5, 6, 15, 0.85);
+      border: 1px solid rgba(180, 200, 255, 0.25);
+      color: var(--star);
+      font-size: 13px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      letter-spacing: 0.08em;
+      transform: translate(12px, -50%);
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      white-space: nowrap;
+      z-index: 4;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+    }
+
+    #tooltip.visible { opacity: 1; }
+    #tooltip .en { color: var(--text-dim); font-size: 11px; margin-left: 6px; }
+
+    /* ===== 页脚 ===== */
+    footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 22px 18px;
+      font-size: 11.5px;
+      color: var(--text-dim);
+      letter-spacing: 0.05em;
+      z-index: 2;
+    }
+
+    footer .brand {
+      font-size: 11px;
+      letter-spacing: 0.4em;
+      color: var(--text-dim);
+      opacity: 0.75;
+    }
+
+    footer a {
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    footer a:hover { color: var(--text); }
+
+    footer .sep {
+      margin: 0 10px;
+      color: rgba(180, 200, 255, 0.2);
+    }
+
+    .icon {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      vertical-align: -2px;
+      margin-right: 4px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>星 · 图</h1>
+    <p class="subtitle">S T A R · M A P</p>
+  </header>
+
+  <canvas id="starfield"></canvas>
+  <div id="tooltip"></div>
+
+  <footer>
+    <span class="brand">带鱼的思考</span>
+    <div class="beian">
+      <a href="https://beian.mps.gov.cn/" target="_blank" rel="noopener">
+        <svg class="icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <path fill="currentColor" d="M512 64L96 256v512l416 192 416-192V256L512 64zm0 117.6l307.2 141.6v377.6L512 842.4 204.8 700.8V323.2L512 181.6zM512 320a192 192 0 1 0 0 384 192 192 0 0 0 0-384zm0 96a96 96 0 1 1 0 192 96 96 0 0 1 0-192z"/>
+        </svg>
+        鲁公网安备 37030302001124 号
+      </a>
+      <span class="sep">|</span>
+      <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">
+        鲁ICP备2025191652号
+      </a>
+    </div>
+  </footer>
+
+  <script>
+    // ===== 星图主程序 =====
+    const canvas = document.getElementById('starfield');
+    const ctx = canvas.getContext('2d');
+    const tooltip = document.getElementById('tooltip');
+
+    let W = 0, H = 0, DPR = window.devicePixelRatio || 1;
+    let stars = [];
+    let constellations = [];
+    let mouse = { x: -9999, y: -9999 };
+    let parallax = { x: 0, y: 0 };
+    let parallaxTarget = { x: 0, y: 0 };
+    let meteors = [];
+    let lastMeteor = 0;
+
+    // ===== 星座数据 (相对坐标 0~1) =====
+    const CONSTELLATIONS = [
+      {
+        name: '北斗七星', en: 'Big Dipper',
+        stars: [
+          { x: 0.18, y: 0.30, r: 2.4, name: '天枢' },
+          { x: 0.26, y: 0.36, r: 2.0, name: '天璇' },
+          { x: 0.34, y: 0.30, r: 2.1, name: '天玑' },
+          { x: 0.42, y: 0.36, r: 2.0, name: '天权' },
+          { x: 0.52, y: 0.50, r: 2.1, name: '玉衡' },
+          { x: 0.62, y: 0.56, r: 2.3, name: '开阳' },
+          { x: 0.72, y: 0.52, r: 1.9, name: '摇光' },
+        ],
+        lines: [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6]]
+      }
+    ];
+
+    function resize() {
+      W = window.innerWidth;
+      H = window.innerHeight;
+      canvas.width = W * DPR;
+      canvas.height = H * DPR;
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      buildStars();
+    }
+
+    function rand(a, b) { return a + Math.random() * (b - a); }
+
+    function buildStars() {
+      stars = [];
+      constellations = [];
+
+      // 星座星
+      CONSTELLATIONS.forEach(c => {
+        const cs = { name: c.name, en: c.en, stars: [], lines: c.lines };
+        c.stars.forEach(s => {
+          cs.stars.push({
+            x: s.x * W,
+            y: s.y * H,
+            r: s.r,
+            name: s.name,
+            twinkle: Math.random() * Math.PI * 2,
+            isNamed: true
+          });
+        });
+        constellations.push(cs);
+      });
+
+      // 背景星
+      const count = Math.floor((W * H) / 3500);
+      for (let i = 0; i < count; i++) {
+        stars.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          r: rand(0.3, 1.4),
+          a: rand(0.25, 0.9),
+          twinkle: Math.random() * Math.PI * 2,
+          speed: rand(0.005, 0.02),
+          isNamed: false
+        });
+      }
+    }
+
+    function spawnMeteor() {
+      const startX = rand(W * 0.5, W * 1.1);
+      const startY = rand(-20, H * 0.3);
+      meteors.push({
+        x: startX,
+        y: startY,
+        vx: -rand(5, 9),
+        vy: rand(3, 6),
+        life: 0,
+        maxLife: rand(40, 70)
+      });
+    }
+
+    function drawNebula() {
+      // 几个柔和的色斑
+      const blobs = [
+        { x: W * 0.25, y: H * 0.3, r: Math.max(W, H) * 0.45, c: 'rgba(80, 60, 160, 0.05)' },
+        { x: W * 0.75, y: H * 0.7, r: Math.max(W, H) * 0.40, c: 'rgba(40, 100, 200, 0.04)' },
+        { x: W * 0.55, y: H * 0.15, r: Math.max(W, H) * 0.30, c: 'rgba(180, 100, 160, 0.03)' },
+      ];
+      blobs.forEach(b => {
+        const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+        g.addColorStop(0, b.c);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+      });
+    }
+
+    function drawBackgroundStars(t) {
+      stars.forEach(s => {
+        const tw = (Math.sin(t * s.speed + s.twinkle) + 1) / 2;
+        const alpha = s.a * (0.55 + 0.45 * tw);
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(247, 244, 230, ${alpha})`;
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+        if (s.r > 1.0) {
+          // 弱光晕
+          const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.r * 4);
+          g.addColorStop(0, `rgba(247, 244, 230, ${alpha * 0.4})`);
+          g.addColorStop(1, 'rgba(247, 244, 230, 0)');
+          ctx.fillStyle = g;
+          ctx.fillRect(s.x - s.r * 4, s.y - s.r * 4, s.r * 8, s.r * 8);
+        }
+      });
+    }
+
+    function drawConstellationLines(hot) {
+      ctx.lineWidth = 1.1;
+      constellations.forEach(c => {
+        c.stars.forEach((a, i) => {
+          c.lines.forEach(([u, v]) => {
+            const s1 = c.stars[u], s2 = c.stars[v];
+            if ((s1 === a || s2 === a) === false && !hot) return;
+            const isHot = hot === c;
+            ctx.strokeStyle = isHot ? 'rgba(180, 200, 255, 0.7)' : 'rgba(180, 200, 255, 0.18)';
+            ctx.beginPath();
+            ctx.moveTo(s1.x, s1.y);
+            ctx.lineTo(s2.x, s2.y);
+            ctx.stroke();
+          });
+        });
+      });
+    }
+
+    function drawConstellationStars(t, hot) {
+      constellations.forEach(c => {
+        c.stars.forEach(s => {
+          const tw = (Math.sin(t * 0.003 + s.twinkle) + 1) / 2;
+          const isHot = hot === c;
+          const r = s.r * (isHot ? 1.4 : 1.0);
+          const a = isHot ? 1.0 : (0.7 + 0.3 * tw);
+
+          // 光晕
+          const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r * 6);
+          g.addColorStop(0, `rgba(180, 210, 255, ${a * 0.5})`);
+          g.addColorStop(0.4, `rgba(247, 244, 230, ${a * 0.25})`);
+          g.addColorStop(1, 'rgba(247, 244, 230, 0)');
+          ctx.fillStyle = g;
+          ctx.fillRect(s.x - r * 6, s.y - r * 6, r * 12, r * 12);
+
+          ctx.beginPath();
+          ctx.fillStyle = `rgba(247, 244, 230, ${a})`;
+          ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 十字光芒 (亮星)
+          if (r > 2.0) {
+            ctx.strokeStyle = `rgba(247, 244, 230, ${a * 0.5})`;
+            ctx.lineWidth = 0.6;
+            ctx.beginPath();
+            ctx.moveTo(s.x - r * 4, s.y);
+            ctx.lineTo(s.x + r * 4, s.y);
+            ctx.moveTo(s.x, s.y - r * 4);
+            ctx.lineTo(s.x, s.y + r * 4);
+            ctx.stroke();
+          }
+        });
+      });
+    }
+
+    function drawMeteors() {
+      meteors.forEach((m, i) => {
+        m.life++;
+        m.x += m.vx;
+        m.y += m.vy;
+        const alpha = 1 - m.life / m.maxLife;
+        if (alpha <= 0) { meteors.splice(i, 1); return; }
+        const g = ctx.createLinearGradient(m.x, m.y, m.x - m.vx * 8, m.y - m.vy * 8);
+        g.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+        g.addColorStop(0.4, `rgba(200, 220, 255, ${alpha * 0.5})`);
+        g.addColorStop(1, 'rgba(200, 220, 255, 0)');
+        ctx.strokeStyle = g;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(m.x, m.y);
+        ctx.lineTo(m.x - m.vx * 8, m.y - m.vy * 8);
+        ctx.stroke();
+      });
+    }
+
+    function findHovered() {
+      let best = null;
+      let bestDist = Infinity;
+      const allNamed = [];
+      constellations.forEach(c => c.stars.forEach(s => allNamed.push({ s, c })));
+      allNamed.forEach(({ s, c }) => {
+        const dx = s.x - mouse.x;
+        const dy = s.y - mouse.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < 22 && d < bestDist) {
+          bestDist = d;
+          best = { s, c };
+        }
+      });
+      return best;
+    }
+
+    function render(t) {
+      ctx.clearRect(0, 0, W, H);
+      drawNebula();
+      drawBackgroundStars(t);
+
+      const hot = (() => {
+        const h = findHovered();
+        return h ? h.c : null;
+      })();
+
+      drawConstellationLines(hot);
+      drawConstellationStars(t, hot);
+      drawMeteors();
+    }
+
+    function loop(t) {
+      // 视差
+      parallax.x += (parallaxTarget.x - parallax.x) * 0.05;
+      parallax.y += (parallaxTarget.y - parallax.y) * 0.05;
+      ctx.setTransform(DPR, 0, 0, DPR, parallax.x, parallax.y);
+
+      render(t);
+
+      // 偶尔生成流星
+      if (t - lastMeteor > 8000 + Math.random() * 8000) {
+        spawnMeteor();
+        lastMeteor = t;
+      }
+
+      requestAnimationFrame(loop);
+    }
+
+    // 鼠标事件 (canvas 铺满 viewport, 坐标即视口坐标)
+    canvas.addEventListener('mousemove', e => {
+      mouse.x = e.clientX;
+      mouse.y = e.clientY;
+      const cx = W / 2, cy = H / 2;
+      const dx = (mouse.x - cx) / W;
+      const dy = (mouse.y - cy) / H;
+      parallaxTarget.x = -dx * 12;
+      parallaxTarget.y = -dy * 8;
+
+      const h = findHovered();
+      if (h) {
+        tooltip.innerHTML = `${h.s.name}<span class="en">${h.c.name} · ${h.c.en}</span>`;
+        tooltip.style.left = e.clientX + 'px';
+        tooltip.style.top = e.clientY + 'px';
+        tooltip.classList.add('visible');
+      } else {
+        tooltip.classList.remove('visible');
+      }
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+      mouse.x = -9999;
+      mouse.y = -9999;
+      parallaxTarget.x = 0;
+      parallaxTarget.y = 0;
+      tooltip.classList.remove('visible');
+    });
+
+    // 触屏
+    canvas.addEventListener('touchmove', e => {
+      if (e.touches.length === 0) return;
+      const t = e.touches[0];
+      mouse.x = t.clientX;
+      mouse.y = t.clientY;
+    }, { passive: true });
+
+    window.addEventListener('resize', resize);
+    resize();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
